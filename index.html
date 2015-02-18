@@ -1,0 +1,323 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+  <head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <link rel="shortcut icon" href="favicon.ico">
+  <title>Sanapeli</title>
+  <script type="text/javascript" src="sanat.js"></script>
+  <script type="text/javascript"> 
+  
+  // Määritellään tarvittavat muuttujat
+  //Arvuuteltavat sanat ovat omassa tiedostossaan
+  var sanaoriginal;   //Sana originaalimuodossa
+  var sana;           //Sana isoilla kirjaimilla
+  var merkit;         //Taulukko sanoissa olevista merkeistä
+  var virheet = 7;    //Virheiden maksimäärä
+  var virheetcount;   //Virhemäärälaskuri
+  var arvaukset;      //Arvatut kirjaimet
+  var old;            //Aloitusaika
+  var pelit = 0;      //Laskuri pelatuista peleistä
+  var voitot = 0;     //Laskuri voitoista
+  var tappiot = 0;    //Laskuri tappioista
+  
+//Luo pelin alustamalla muuttujat ja rakentamalla pelikentän. 
+//(oma) määrittää true arvolla, että pelaaja haluaa antaa oman sanan
+  function sanapeli(oma)
+  {
+  //tarkistetaan, mistä sana haetaan
+  if (oma)
+    {
+    sanaoriginal = prompt('Kirjoita arvuuteltava sana');
+    }
+  else
+    {
+    // jos sana haetaan valmiista taulukosta, tarkistetaan, onko taulukossa sanoja jäljellä, jos ei annetaan virheilmoitus
+    if (Sanat.length > 0)
+      {
+      // arvotaan sana taulukosta ja poistetaan sitten se
+      index = Math.floor(Math.random() * Sanat.length);
+      sanaoriginal = Sanat[index];
+      Sanat.splice(index,1);
+      }
+    else
+      {
+      //Virheilmoitus, ettei sanoja ole ja function suoritus keskeytetään
+      // Virhemäärän nostaminen maksimiin estää näppäimistö- ja hiirisyöteet
+      document.getElementById('ohje').innerHTML = 'Voi ei :(<br>Olet arvuutellut jo kaikki sanat läpi.';
+      virheetcount = virheet;
+      return;
+      }
+    }  
+  
+  //Prosesssoidaan sana isoiksi kirjaimiksi ja korvataan sanassa olevat välilyönnit erikoismerkillä, jotta ne näkyvät järkevästi
+  sana = sanaoriginal.toUpperCase().replace(/[' ']/g, '»');
+  
+  //Alustetaan ennaltamääritellyt muuttujat
+  merkit = new Array();
+  virheetcount = 0;   
+  arvaukset = new Array();
+  old = new Date();
+  
+  //luodaan sanasta kaksisarakkeinen taulukko merkit, jossa on kaikki merkit ja niiden näkyvyys true tai false
+  //Kaikki kirjaimet piilotetaan ja numerot ja muut erikoismerkit jätetään näkyviin. 
+  for (var i=0;i<sana.length;i++)
+    {
+      merkit.push( [] );
+      merkit[i][0] = sana.charAt(i);
+      if (!/[^A-ZÅÄÖ]/.test(sana.charAt(i)))
+      {
+      merkit[i][1] = false;
+      }
+      else
+      {
+      merkit[i][1] = true;
+      } 
+    }
+  
+  //Alustetaan tilannekuva
+  document.getElementById('kuva').src = '0.png';
+  
+  //Tyhjennetään pelialue kaikesta edellisen kierroksen liittyvästä
+  document.getElementById('playground').innerHTML = '';
+  
+  //Luodaan pelialueelle span-elementeillä kaikille merkeille oma paikka ja annetaan niille omat ID:t
+  for(var i in merkit)
+    {
+    document.getElementById('playground').innerHTML += '<span id="merkki_'+i+'">&nbsp;</span>';
+    }
+  
+  //Alustetaan ohje-div kertomaan mitä pitää tehdä
+  document.getElementById('ohje').innerHTML = 'Tervetuloa pelaamaan sanapeliä.<br>Voit käyttää hiirtä tai näppäimistöä.';
+  
+  //Alustetaan kirjainpainikkeet
+  document.getElementById('kirjaimet').innerHTML = '';    
+  
+  //Luodaan kirjainpainikkeet kirjaimet-diviin. Aloitetaan 65-90 väliltä kirjaimet A-Z ja sitten 197 Å ja sitten 214 Ö.
+  //Koska Ä (196) on ennen Å (197), täytyy Ä jättää väliin ja tehdä se sitten kun Å on tehty muuttamalla ja palauttamalla indexiä 
+  for (var i=65;i<=214;i++)
+    {
+    if (i>=65 && i<=90 || i==197 || i==214)
+      { 
+      document.getElementById('kirjaimet').innerHTML += '<button type="button" id="merkki_'+i+'" onclick="arvaa('+i+');">'+String.fromCharCode(i)+'</button>';
+      if (i == 197)
+        {
+        i = 196;
+        document.getElementById('kirjaimet').innerHTML += '<button type="button" id="merkki_'+i+'" onclick="arvaa('+i+');">'+String.fromCharCode(i)+'</button>';
+        i = 197;
+        }
+      }
+    }
+    
+  //Tehdään napit Uudelle pelille ja Uudelle omalle pelille uusi-diviin
+  document.getElementById('uusi').innerHTML = '<button type="button" onclick="sanapeli(false)">Uusi peli</button>&nbsp;<button type="button" onclick="sanapeli(true)">Uusi peli omalla sanalla</button>';
+  
+  //Tulostetaan tietoa pelatuista peleistä scores-diviin
+  document.getElementById('scores').innerHTML = 'Pelattuja pelejä: '+pelit+' Voitot: '+voitot+' Tappiot: '+tappiot;
+  luo();  
+  }
+
+  //Funktio, joka päivittää pelialueen merkkien näkyvyyden käymällä läpi merkit[][] taulukon, jossa on kaikki merkit ja niiden näkyvyys true tai false
+  function luo()
+  {
+  for(var i in merkit)
+    {
+      if (merkit[i][1])
+      {
+      document.getElementById('merkki_'+i).innerHTML = merkit[i][0];
+      }
+    }           
+  }
+  
+  //Vastaanottaa arvatun kirjaimen kirjainkoodina ja käy läpi tilanteen
+  function arvaa(code)
+  {
+  //tarkistaa, onko virhelaskuri pienempi kuin sallitut virheet. Jos on, antaa jatkaa peliä. Muuten ei tehdä mitään.
+  if (virheetcount < virheet)
+  {
+  //Poimii kirjaimen koodin perusteella
+  kirjain = String.fromCharCode(code);
+  
+  //Tarkistaa, ettei kirjainta ole jo arvattu käymällä läpi arvatut kirjaimet arvaukset-taulukosta
+  if (arvaukset.join('').indexOf(kirjain) == -1)
+    {
+    //Siirtää arvatun kirjaimen arvaukset taulukkoon ja luo laskurin, johon lasketaan, montako kertaa merkki löytyi
+    arvaukset.push(kirjain);
+    var laskuri = 0;
+   
+   //Käy läpi merkit-taulukon ja tarkistaa, löytyykö arvattua kirjainta. Jos löytyy, muuttaa merkin arvon false --> true 
+   //Jos merkki löytyy, kasvattaa laskuria
+   for(var i in merkit)
+      {
+       if (merkit[i][0] == kirjain)
+        {
+        merkit[i][1] = true;
+        laskuri++;
+        }
+      }
+    
+    //Tarkistetaan laskuri-muuttujan avulla, löytyikö sanasta arvattuja merkkejä.  
+    if(laskuri > 0)
+      { 
+      //Jos merkkejä löytyi, tulostetaan ohje-diviin montako kertaa merkki löytyi ja montako virhettä on jäljellä
+      document.getElementById('ohje').innerHTML = 'Kirjain '+kirjain+' löytyi '+laskuri+' kertaa.<br>Virheisiin varaa '+(virheet-virheetcount)+' kpl.';
+      }
+    else
+      {
+      //Jos arvattua merkkiä ei löytynyt sanasta, kasvatetaan virhelaskuria yhdellä, haetaan virhemäärään viittava tilannekuva ja tulostetaan ohje-diviin tieto, ettei löytynyt ja montako virhettä jäljellä
+      virheetcount++;
+      document.getElementById('kuva').src = virheetcount+'.png';
+      document.getElementById('ohje').innerHTML = 'Kirjainta '+kirjain+' ei löytynyt.<br>Virheisiin varaa '+(virheet-virheetcount)+' kpl.';
+      }
+    
+    //Tarkistetaan, onko kaikki virhearvaukset käytetty
+    if (virheetcount == virheet)
+      {
+      //Jos kaikki virhearvaukset on käytetty, määritetään tilannekuva, kasvatetaan pelit- ja tappiolaskuria, tulostetaan ohje-diviin tieto tappiosta ja oikea vastaus ja päivitetään pelistatistiikka
+      document.getElementById('kuva').src = 'end.gif';
+      pelit++;
+      tappiot++;
+      document.getElementById('ohje').innerHTML = 'Hävisit!<br>Oikea vastaus olisi ollut "'+sanaoriginal+'".';
+      document.getElementById('scores').innerHTML = 'Pelattuja pelejä: '+pelit+' Voitot: '+voitot+' Tappiot: '+tappiot;
+      
+      //määritetään kaikki merkit näkyviksi, jotta oikea vastaus voidaan myöhemmin näyttää myös pelialueella
+      for(var i in merkit)
+        {
+          merkit[i][1] = true;
+        }
+      }
+    else
+      {
+      //Jos virhearvauksia on vielä jäljellä, tarkistetaan onko sana ratkaistu
+      //Alustetaan tulos muuttuja, jonka avulla määritetään, onko merkkejä vielä arvaamatta
+      var tulos = true;
+      
+      //käydään läpi kaikkien merkkien näkyvyysarvot merkit-taulukosta
+      for(var i in merkit)
+        {
+        //Jos arvattavia merkkejä löytyy vielä, päivitetään tulos muuttuja ja keskeytetään silmukka
+        if (merkit[i][1] == false){tulos = false; break;}
+        }
+      
+      //Jos kaikki merkit on jo arvattu, eli tulos muuttuja ei palauta falsea, päivitetään tilanne voitoksi
+      if (tulos == true)
+        {
+        //Otetaan ylös loppuaika, virhemäärän nostaminen maksimiin estää näppäimistö- ja hiirisyöteet, päivitetään tilannekuva, kasvatetaan pelit- ja voittolaskuria, tulostetaan ohje-diviin tieto voitosta ja päivitetään pelistatistiikka  
+        var now = new Date();
+        virheetcount = virheet;
+        document.getElementById('kuva').src = 'jihaa.png';
+        pelit++;
+        voitot++;
+        document.getElementById('ohje').innerHTML = 'Hienoa!<br>Sait ratkaistua tehtävän ajassa '+((now-old)/1000).toFixed(0)+' sekuntia.';
+        document.getElementById('scores').innerHTML = 'Pelattuja pelejä: '+pelit+' Voitot: '+voitot+' Tappiot: '+tappiot;
+        }
+      }  
+    
+    //Disabloidaan arvattu nappi kirjaimista
+    document.getElementById('merkki_'+code).disabled = 'disabled';
+  
+  //Kutsutaan luo()-funktiota, joka päivittää merkit pelialueella
+    luo();
+  }
+  
+  //Jos kirjain on jo arvattu, huomautetaan siitä.
+  else
+  {
+  document.getElementById('ohje').innerHTML = 'Kirjain '+kirjain+' on jo arvattu.<br>Virheisiin varaa '+(virheet-virheetcount)+' kpl.';
+  }
+  }  
+  }
+  
+  //Vastaanottaa näppäinsyötteet
+  function keyEventhandler(e)
+  {
+      var code, elem;
+      e = e || window.event;
+      if (e.keyCode)
+          code = e.keyCode;
+      else if (e.which)
+          code = e.which;
+
+      //tarkistaa, onko virheyrityksiä jäljellä. Jos ei, ei tehdä mitään.
+      //Vastaanottaa näppäimistökoodin ja muuttaa ääkköset oikeiksi arvoiksi
+      if(virheetcount < virheet)
+      {  
+      if(code==221){arvaa(197);}
+      else if(code==222){arvaa(196);}
+      else if(code==192){arvaa(214);}
+      else if(code >= 65 && code <= 90){arvaa(code);}
+      }
+  }  
+  
+  </script>
+  
+  <style type="text/css">
+  #content{
+  text-align: center;
+  }
+  
+  #playground{
+  text-align: center;
+  margin: 20px 0;
+  }
+  
+  #ohje{
+  text-align: center;
+  margin: 20px 0;
+  font: 20px courier, arial,sans-serif;
+  }
+  
+  #kirjaimet{
+  text-align: center;
+  margin: 20px auto;
+  width: 320px;
+  }
+  
+  #scores{
+  text-align: center;
+  margin: 10px 0;
+  font: 14px courier, arial,sans-serif;
+  }
+  
+  span{
+  font: 25px courier,arial,sans-serif;
+  text-align: center;
+  border-bottom: 2px solid black;
+  margin: 0 5px;
+  width: 1em;
+  display: inline-block;
+  }
+  
+  #kirjaimet button{
+  width: 35px;
+  margin: 2.5px;
+  font: 25px courier,arial,sans-serif;
+  display: inline-block;
+  }
+  </style>
+  </head>
+  <body onload="sanapeli(false)" onkeydown="keyEventhandler(event)">
+  <div id="content">
+  
+  <img id="kuva" width="138" height="150" src="0.png" title="Laineet ne keinuttaa laivaa" alt="Laineet ne keinuttaa laivaa">
+  
+  <div id="playground">
+  </div>
+
+  <div id="ohje">
+  </div>  
+
+  <div id="kirjaimet">
+  </div>
+  
+  <div id="uusi">
+  </div>
+  
+  <div id="scores">
+  </div>
+  
+  </div>
+  </body>
+</html>
+
+                                 
